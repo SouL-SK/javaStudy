@@ -1,6 +1,6 @@
 package me.whiteship.java8to11;
 
-public interface Bar extends InterfaceFoo{
+public interface Bar extends InterfaceFoo {
 
 //    void printNameUpperCase();
 

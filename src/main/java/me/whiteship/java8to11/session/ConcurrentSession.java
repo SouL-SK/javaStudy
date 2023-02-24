@@ -84,7 +84,7 @@ public class ConcurrentSession {
 
         // singleThread 라 1개의 쓰레드만 돌지만
         ExecutorService executorService = Executors.newSingleThreadExecutor();
-        executorService.submit(() ->{
+        executorService.submit(() -> {
             System.out.println("Thread: " + Thread.currentThread().getName());
         });
 
@@ -114,6 +114,7 @@ public class ConcurrentSession {
     public static void callableFuture() throws ExecutionException, InterruptedException {
 
         /**
+         * 16. Callable 과 Future
          * Callable 은 Runnable 과 유사하지만 작업의 결과를 받을 수 있다는 차이가 있다.
          * Runnable 의 run method 는 void 타입이라 결과를 반환하지 않는다.
          * Future 은 비동기적인 작업의 현태 상태를 조회하거나 결과를 가져올 수 있다.
