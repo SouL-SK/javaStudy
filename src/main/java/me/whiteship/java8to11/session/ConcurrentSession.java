@@ -7,18 +7,21 @@ import java.util.List;
 import java.util.concurrent.*;
 
 public class ConcurrentSession {
+
     /**
      * 자바 Concurrent 프로그래밍 배경 지식
      * Concurrent software : 동시에 여러 작업을 할 수 있는 소프트웨어
      * 자바에서 지원하는 컨커런트 프로그래밍 : 멀티 프로세싱 (ProcessBuilder), 멀티 쓰레드
      * 자바 멀티 쓰레드 프로그래밍 : Thread / Runnable
      */
-
     public static void main(String[] args) throws InterruptedException, ExecutionException {
 //        runnableThread();
 //        executorsEx();
-        callableFuture();
+//        callableFuture();
+//        completableFuture1();
+        completableFuture2();
     }
+
 
     static class MyThread extends Thread {
         @Override
@@ -66,21 +69,21 @@ public class ConcurrentSession {
         // join 을 쓰면 interrupt 랑 다르게 다른 쓰레드가 끝날 때까지 기다리고 진행한다.
     }
 
+    /**
+     * 고수준 (High-level) Concurrency programming
+     * 쓰레드를 만들고 관리하는 작업을 애플리케이션에서 분리, 그런 기능을 Executors 에게 위임.
+     *
+     * Executors 가 하는 일:
+     *   쓰레드 만들기: 애플리케이션이 사용할 쓰레드 풀을 만들어 관리한다.
+     *   쓰레드 관리: 쓰레드 생명 주기를 관리한다.
+     *   작업 처리 및 실행: 쓰레드로 실행할 작업을 제공할 수 있는 API를 제공한다.
+     *
+     * 주요 인터페이스
+     *   Executor: execute(Runnable)
+     *   ExecutorService: Executor 상속 받은 인터페이스로, Callable 도 실행할 수 있으며, Executor 를 종료시키거나, 여러 Callable 을 동시에 실행하는 등의 기능을 제공한다.
+     *   ScheduledExecutorService: ExecutorService 를 상속 받은 인터페이스로 특정 시간 이후에 또는 주기적으로 작업을 실행할 수 있다.
+     */
     static void executorsEx() {
-        /**
-         * 고수준 (High-level) Concurrency programming
-         * 쓰레드를 만들고 관리하는 작업을 애플리케이션에서 분리, 그런 기능을 Executors 에게 위임.
-         *
-         * Executors 가 하는 일:
-         *   쓰레드 만들기: 애플리케이션이 사용할 쓰레드 풀을 만들어 관리한다.
-         *   쓰레드 관리: 쓰레드 생명 주기를 관리한다.
-         *   작업 처리 및 실행: 쓰레드로 실행할 작업을 제공할 수 있는 API를 제공한다.
-         *
-         * 주요 인터페이스
-         *   Executor: execute(Runnable)
-         *   ExecutorService: Executor 상속 받은 인터페이스로, Callable 도 실행할 수 있으며, Executor 를 종료시키거나, 여러 Callable 을 동시에 실행하는 등의 기능을 제공한다.
-         *   ScheduledExecutorService: ExecutorService 를 상속 받은 인터페이스로 특정 시간 이후에 또는 주기적으로 작업을 실행할 수 있다.
-         */
 
         // singleThread 라 1개의 쓰레드만 돌지만
         ExecutorService executorService = Executors.newSingleThreadExecutor();
@@ -111,15 +114,15 @@ public class ConcurrentSession {
         return () -> System.out.println(message + Thread.currentThread().getName());
     }
 
+    /**
+     * 16. Callable 과 Future
+     * Callable 은 Runnable 과 유사하지만 작업의 결과를 받을 수 있다는 차이가 있다.
+     * Runnable 의 run method 는 void 타입이라 결과를 반환하지 않는다.
+     * Future 은 비동기적인 작업의 현태 상태를 조회하거나 결과를 가져올 수 있다.
+     * Callable 로 받아론 결과를 Future 로 핸들링 할 수 있다.
+     */
     public static void callableFuture() throws ExecutionException, InterruptedException {
 
-        /**
-         * 16. Callable 과 Future
-         * Callable 은 Runnable 과 유사하지만 작업의 결과를 받을 수 있다는 차이가 있다.
-         * Runnable 의 run method 는 void 타입이라 결과를 반환하지 않는다.
-         * Future 은 비동기적인 작업의 현태 상태를 조회하거나 결과를 가져올 수 있다.
-         * Callable 로 받아론 결과를 Future 로 핸들링 할 수 있다.
-         */
 
 //        ExecutorService executorService = Executors.newSingleThreadExecutor();
         ExecutorService executorService = Executors.newFixedThreadPool(4);
@@ -165,5 +168,124 @@ public class ConcurrentSession {
         System.out.println(s);
         System.out.println("End!!!!!!");
         executorService.shutdown();
+    }
+
+    /**
+     * 17. CompletableFuture
+     * 자바에서 비동기 (Asynchronous) 프로그래밍을 가능케 하는 인터페이스
+     * Future 만으로 힘든 부분을 CompletableFuture 로 구현한다.
+     */
+    public static void completableFuture1() throws ExecutionException, InterruptedException {
+        // 기존의 Future 를 사용했을 때의 단점,
+        // - Future 를 외부에서 완료 시킬 수 없다. 취소하거나, get() 에 타임아웃을 설정할 수는 있다.
+        // - 블로킹 코드 (get()) 을 사용하지 않고서는 작업이 끝났을 때 콜백을 실행할 수 없다.
+        // - 여러 Future 를 조합할 수 있다. 예) Event 정보 가져온 다음 Event 에 참석하는 회원 목록 가져오기
+        // - 예외 처리용 API 를 제공하지 않는다.
+        ExecutorService executorService = Executors.newFixedThreadPool(4);
+        Future<String> futureEx1 = executorService.submit(() -> "hello");
+
+        // TODO
+        futureEx1.get();
+
+        // completableFuture 를 사용했을 때의 개선점,
+        // 외부에서 Future 완료 시키기가 가능하다.
+
+        // 생성 후에 complete 를 통해 future 완료 시키기 -- 정석 코드
+        CompletableFuture<String> completableFutureEx1 = new CompletableFuture<>();
+        completableFutureEx1.complete("soul is best!");
+        // get() 이 없어지진 않는다. (블로킹 코드 후 값 가져오기)
+        System.out.println(completableFutureEx1.get());
+        System.out.println("-------------------------------------");
+
+        // 생성 후에 complete 를 통해 future 완료 시키기 -- 간결화
+        CompletableFuture<String> completableFutureEx2 = CompletableFuture.completedFuture("soul is great!");
+        System.out.println(completableFutureEx2.get());
+        System.out.println("-------------------------------------");
+
+        // return 이 없는 경우
+        CompletableFuture<Void> noReturnFuture = CompletableFuture.runAsync(() -> {
+            System.out.println("Hello! There is no return values, good luck :) " + Thread.currentThread().getName() + "\n");
+        });
+        // get() 이나 join() 를 해야만 값이 출력된다.
+        noReturnFuture.get();
+        System.out.println("-------------------------------------");
+
+        // return 이 있는 경우
+        CompletableFuture<String> hasReturnFuture = CompletableFuture.supplyAsync(() -> {
+            System.out.println("Hello! There is return values, thx :) " + Thread.currentThread().getName() + "\n");
+            return "future is completed";
+        });
+        System.out.println(hasReturnFuture.get());
+
+        System.out.println("-------------------thenApply(Function): 리턴값을 받아서 다른 값으로 바꾸는 콜백------------------");
+
+        // 콜백의 유형 < thenApply(Function), thenAccept(Consumer), thenRun(Runnable) >
+        // thenApply(Function): 리턴값을 받아서 다른 값으로 바꾸는 콜백, 리턴이 있다.
+        CompletableFuture<String> callBackApply = CompletableFuture.supplyAsync(() -> {
+            System.out.println("This is call back future you can make, when you use the completableFuture only." + Thread.currentThread().getName() + "\n");
+            return "call back is ready";
+        }).thenApply((s) -> {
+            System.out.println(Thread.currentThread().getName());
+            return s.toUpperCase();
+        });
+
+        callBackApply.get();
+        System.out.println("-------------------thenAccept(Consumer): 리턴값을 또 다른 작업을 처리하는 콜백(리턴 없이)------------------");
+        // thenAccept(Consumer): 리턴값을 또 다른 작업을 처리하는 콜백(리턴 없이)
+        CompletableFuture<Void> callBackAccept = CompletableFuture.supplyAsync(() -> {
+            System.out.println("This is call back future you can make, when you use the completableFuture only." + Thread.currentThread().getName() + "\n");
+            return "call back is ready";
+        }).thenAccept((s) -> { // 위의 작업이 끝난 결과를 가지고 또 다른 작업을 진행. 리턴은 없다. Consumer 가 들어온다.
+            System.out.println(Thread.currentThread().getName());
+            System.out.println(s.toUpperCase());
+        });
+
+        callBackAccept.get();
+        System.out.println("-------------------thenRun(Runnable): 리턴값 받지 않고 다른 작업을 처리하는 콜백------------------");
+        // thenRun(Runnable): 리턴값 받지 않고 다른 작업을 처리하는 콜백
+        CompletableFuture<Void> callBackRun = CompletableFuture.supplyAsync(() -> {
+            System.out.println("This is call back future you can make, when you use the completableFuture only." + Thread.currentThread().getName() + "\n");
+            return "call back is ready";
+        }).thenRun(() -> { // 리턴은 필요없고, 작업을 하는 것이 중요하다. (결과값을 참고도 못한다.)
+            System.out.println(Thread.currentThread().getName());
+        });
+
+        callBackRun.get();
+        System.out.println("-------------------------------------");
+
+        // Thread.currentThread().getName() 을 해보면 현재 Executor(ThreadPool) 을 알 수 있다. ThreadPool 바꿀 수 있다.
+        // 콜백 자체를 또 다른 쓰레드에서 실행할 수 있다.
+        // Default ThreadPool: ForkJoinPool.commonPool()
+        ExecutorService executorService1 = Executors.newFixedThreadPool(8);
+        System.out.println("Before) current Thread Pool: " + Thread.currentThread().getName());
+        CompletableFuture<Void> executorChange = CompletableFuture.supplyAsync(() -> {
+            System.out.println("Executor changing!! currentThread is " + Thread.currentThread().getName() + "\n");
+            return "Executor changed!!";
+        }, executorService1).thenRun(() -> { // 여기서 Executor 변경 적용
+            System.out.println("After) current Thread Pool: " + Thread.currentThread().getName());
+        });
+
+        executorChange.get();
+        System.out.println("-------------------------------------");
+    }
+
+    /**
+     * 18. CompletableFuture 2
+     */
+    public static void completableFuture2() throws InterruptedException, ExecutionException{
+
+        System.out.println("CompletableFuture 조합하기");
+        // thenCompose(): 두 작업이 서로 이어서 실행하도록 조합
+
+        // thenCombine(): 두 작업을 독립적으로 실행하고 둘 다 종료했을 때 콜백 실행
+
+        // allOf(): 여러 작업을 모두 실행하고 모든 작업 결과에 콜백 실행
+
+        // anyOf(): 여러 작업 중에 가장 빨리 끝난 하나의 결과에 콜백 실행
+
+        System.out.println("예외처리");
+        // exceptionally(Function)
+
+        // handle(BiFunction)
     }
 }
