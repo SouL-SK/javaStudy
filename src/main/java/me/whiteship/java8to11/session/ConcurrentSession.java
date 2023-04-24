@@ -4,7 +4,9 @@ import org.springframework.aop.ThrowsAdvice;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.*;
+import java.util.stream.Collectors;
 
 public class ConcurrentSession {
 
@@ -15,6 +17,22 @@ public class ConcurrentSession {
      * 자바 멀티 쓰레드 프로그래밍 : Thread / Runnable
      */
     public static void main(String[] args) throws InterruptedException, ExecutionException {
+        boolean throwError = true;
+
+        CompletableFuture<String> hello = CompletableFuture.supplyAsync(() -> {
+            if (throwError) {
+                throw new IllegalStateException();
+            }
+
+            System.out.println("Hello " + Thread.currentThread().getName());
+            return "Hello";
+        }).handle((result, ex) -> {
+            if (ex != null) {
+                System.out.println(ex);
+                return "ERROR!";
+            }
+            return result;
+        });
 //        runnableThread();
 //        executorsEx();
 //        callableFuture();
@@ -72,16 +90,16 @@ public class ConcurrentSession {
     /**
      * 고수준 (High-level) Concurrency programming
      * 쓰레드를 만들고 관리하는 작업을 애플리케이션에서 분리, 그런 기능을 Executors 에게 위임.
-     *
+     * <p>
      * Executors 가 하는 일:
-     *   쓰레드 만들기: 애플리케이션이 사용할 쓰레드 풀을 만들어 관리한다.
-     *   쓰레드 관리: 쓰레드 생명 주기를 관리한다.
-     *   작업 처리 및 실행: 쓰레드로 실행할 작업을 제공할 수 있는 API를 제공한다.
-     *
+     * 쓰레드 만들기: 애플리케이션이 사용할 쓰레드 풀을 만들어 관리한다.
+     * 쓰레드 관리: 쓰레드 생명 주기를 관리한다.
+     * 작업 처리 및 실행: 쓰레드로 실행할 작업을 제공할 수 있는 API를 제공한다.
+     * <p>
      * 주요 인터페이스
-     *   Executor: execute(Runnable)
-     *   ExecutorService: Executor 상속 받은 인터페이스로, Callable 도 실행할 수 있으며, Executor 를 종료시키거나, 여러 Callable 을 동시에 실행하는 등의 기능을 제공한다.
-     *   ScheduledExecutorService: ExecutorService 를 상속 받은 인터페이스로 특정 시간 이후에 또는 주기적으로 작업을 실행할 수 있다.
+     * Executor: execute(Runnable)
+     * ExecutorService: Executor 상속 받은 인터페이스로, Callable 도 실행할 수 있으며, Executor 를 종료시키거나, 여러 Callable 을 동시에 실행하는 등의 기능을 제공한다.
+     * ScheduledExecutorService: ExecutorService 를 상속 받은 인터페이스로 특정 시간 이후에 또는 주기적으로 작업을 실행할 수 있다.
      */
     static void executorsEx() {
 
@@ -272,20 +290,68 @@ public class ConcurrentSession {
     /**
      * 18. CompletableFuture 2
      */
-    public static void completableFuture2() throws InterruptedException, ExecutionException{
+    public static void completableFuture2() throws InterruptedException, ExecutionException {
+
+        CompletableFuture<String> world = CompletableFuture.supplyAsync(() -> {
+            System.out.println("World " + Thread.currentThread().getName());
+            return "World";
+        });
+        CompletableFuture<String> hello = CompletableFuture.supplyAsync(() -> {
+            System.out.println("Hello " + Thread.currentThread().getName());
+            return "Hello";
+        });
+
 
         System.out.println("CompletableFuture 조합하기");
-        // thenCompose(): 두 작업이 서로 이어서 실행하도록 조합
+        System.out.println("thenCompose(): 두 작업이 서로 이어서 실행하도록 조합");
+        System.out.println("hello 작업 뒤에 다른 작업이 진행되도록 할 수 있다. 물론 서로 연관관계가 있어야 한다.");
+        // hello.thenCompose(s -> getWorld(s)); < 이 작업에서 getWorld를 메서드 레퍼런스 방식으로 변경
+        CompletableFuture<String> futureCompose = hello.thenCompose(ConcurrentSession::getWorld);
+        System.out.println(futureCompose.get());
 
-        // thenCombine(): 두 작업을 독립적으로 실행하고 둘 다 종료했을 때 콜백 실행
+        System.out.println("thenCombine(): 두 작업을 독립적으로 실행하고 둘 다 종료했을 때 콜백 실행. 즉, 둘이 연관관계가 없지만 비동기적으로 진행하도록 하고 둘 다 작업 결과가 나왔을 때 get.");
+        CompletableFuture<String> futureCombine = hello.thenCombine(world, (h, w) -> h + " " + w);
+        System.out.println(futureCombine.get());
 
-        // allOf(): 여러 작업을 모두 실행하고 모든 작업 결과에 콜백 실행
 
-        // anyOf(): 여러 작업 중에 가장 빨리 끝난 하나의 결과에 콜백 실행
+        System.out.println("allOf(): 여러 작업을 모두 실행하고 모든 작업 결과에 콜백 실행");
+        CompletableFuture<Void> futureAllOf = CompletableFuture.allOf(hello, world)
+                .thenAccept(System.out::println);
+        System.out.println(futureAllOf.get() + "\n이 allOf 는 null 을 반환한다. 제대로 받는 방법은 아래와 같다.");
+
+        System.out.println("task 로 받을 모든 것을 list에 넣어둔다");
+        List<CompletableFuture<String>> futures = Arrays.asList(hello, world);
+        CompletableFuture[] futureAllOfs = futures.toArray(new CompletableFuture[futures.size()]);
+        CompletableFuture<List<String>> futureReturn = CompletableFuture.allOf(futureAllOfs)
+                .thenApply(v -> futures.stream()
+                        .map(CompletableFuture::join)
+                        .collect(Collectors.toList()));
+        System.out.println("결과를 전부 받는다.");
+
+        futureReturn.get().forEach(System.out::println);
+
+        System.out.println("------anyOf------");
+        System.out.println("anyOf(): 여러 작업 중에 가장 빨리 끝난 하나의 결과에 콜백 실행");
+        CompletableFuture<Void> futureAnyOf = CompletableFuture.anyOf(world, hello).thenAccept(System.out::println);
+        futureAnyOf.get();
+
 
         System.out.println("예외처리");
-        // exceptionally(Function)
+        System.out.println("exceptionally(Function)");
 
-        // handle(BiFunction)
+        System.out.println("handle(BiFunction)");
     }
+
+    private static CompletableFuture<String> getWorld(String message) {
+        return CompletableFuture.supplyAsync(() -> {
+            System.out.println("World " + Thread.currentThread().getName());
+            return message + "world";
+        });
+    }
+
+    /**
+     * 다음에 공부하면 좋은 것들
+     * fork - join framework
+     * flow api
+     */
 }
